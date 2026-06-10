@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, render_template_string, request
 
-from update_coastal_forecast import main as update_firebase
+from update_coastal_forecast import main as update_coastal_forecast
+from test import main as update_port_fishing
 from dialogflow_webhook import handle_dialogflow
 
 app = Flask(__name__)
@@ -14,9 +15,9 @@ HTML = """
 </head>
 <body>
     <h1>海象資料管理系統</h1>
-    <p>手動抓取中央氣象署資料，並更新 Firebase</p>
+    <p>手動更新海邊天氣潮汐 + 商港垂釣資料</p>
 
-    <button onclick="updateData()">手動更新 Firebase</button>
+    <button onclick="updateData()">手動更新全部資料</button>
 
     <pre id="result">尚未執行更新</pre>
 
@@ -47,11 +48,12 @@ def home():
 @app.route("/manual-update")
 def manual_update():
     try:
-        update_firebase()
+        update_coastal_forecast()
+        update_port_fishing()
 
         return jsonify({
             "status": "success",
-            "message": "Firebase 更新完成"
+            "message": "海邊天氣潮汐 + 商港垂釣資料更新完成"
         })
 
     except Exception as e:

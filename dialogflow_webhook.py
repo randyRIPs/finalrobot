@@ -5,6 +5,15 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 
+CITY_LIST = [
+    "台北市", "新北市", "桃園市", "台中市", "台南市", "高雄市",
+    "基隆市", "新竹市", "嘉義市",
+    "新竹縣", "苗栗縣", "彰化縣", "南投縣", "雲林縣",
+    "嘉義縣", "屏東縣", "宜蘭縣", "花蓮縣", "台東縣",
+    "澎湖縣", "金門縣", "連江縣"
+]
+
+
 def get_db():
     if not firebase_admin._apps:
         if os.environ.get("serviceAccountKey"):
@@ -196,7 +205,16 @@ def handle_weather_forecast(req, query_result):
 
 def handle_weather_date_select(req, query_result):
     parameters = query_result.get("parameters", {})
-    query_text = query_result.get("queryText", "")
+    query_text = query_result.get("queryText", "").strip()
+
+    if query_text in CITY_LIST:
+        fake_query_result = {
+            "parameters": {
+                "city": query_text
+            }
+        }
+
+        return handle_weather_forecast(req, fake_query_result)
 
     city = get_city_from_context(req)
 

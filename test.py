@@ -4,15 +4,26 @@ import urllib3
 from datetime import datetime
 from bs4 import BeautifulSoup
 
+import os
+import json
+
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-urllib3.disable_warnings()
-
-# ===== Firebase 初始化 =====
-cred = credentials.Certificate("serviceAccountKey.json")
-
 if not firebase_admin._apps:
+
+    if os.environ.get("serviceAccountKey"):
+        firebase_json = json.loads(
+            os.environ["serviceAccountKey"]
+        )
+
+        cred = credentials.Certificate(firebase_json)
+
+    else:
+        cred = credentials.Certificate(
+            "serviceAccountKey.json"
+        )
+
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()

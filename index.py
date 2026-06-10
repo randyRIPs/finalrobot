@@ -1,4 +1,9 @@
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, request
+import firebase_admin
+from firebase_admin import credentials, firestore
+import os
+import json
+
 from update_coastal_forecast import main as update_firebase
 
 app = Flask(__name__)
@@ -83,9 +88,25 @@ HTML = """
 </html>
 """
 
+
 @app.route("/")
 def home():
     return render_template_string(HTML)
+
+
+def get_db():
+    if not firebase_admin._apps:
+
+        if os.environ.get("serviceAccountKey"):
+            firebase_json = json.loads(os.environ["serviceAccountKey"])
+            cred = credentials.Certificate(firebase_json)
+
+        else:
+            cred = credentials.Certificate("serviceAccountKey.json")
+
+        firebase_admin.initialize_app(cred)
+
+    return firestore.client()
 
 
 @app.route("/manual-update")
@@ -103,6 +124,66 @@ def manual_update():
             "status": "error",
             "message": str(e)
         }), 500
+
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    req = request.get_json(force=True)
+
+    city = (
+        req.get("queryResult", {})
+        .get("parameters", {})
+        .get("city", "")
+    )
+
+    if isinstance(city, list):
+        city = city[0] if city else ""
+
+    if not city:
+        return jsonify({
+            "fulfillmentText": "請問要查詢哪個縣市？"
+        })
+
+    db = get_db()
+
+    doc = (
+        db.collection("coastal_forecast")
+        .document(city)
+        .get()
+    )
+
+    if not doc.exists:
+        return jsonify({
+            "fulfillmentText": f"我是羅翊綸的機器人\n\n找不到 {city} 的資料"
+        })
+
+    data = doc.to_dict()
+    forecast = data.get("forecast", [])
+
+    msg = "我是羅翊綸的機器人\n\n"
+    msg += f"{city} 未來天氣預報\n\n"
+
+    for day in forecast[:3]:
+        display_date = day.get("displayDate", "")
+        weather = day.get("weather", "")
+        temp_min = day.get("tempMin", "")
+        temp_max = day.get("tempMax", "")
+        high_tide = day.get("highTide", [])
+        low_tide = day.get("lowTide", [])
+
+        msg += f"{display_date} {weather} {temp_min}~{temp_max}°C\n"
+
+        if high_tide:
+            msg += "滿潮：" + "、".join(high_tide) + "\n"
+
+        if low_tide:
+            msg += "乾潮：" + "、".join(low_tide) + "\n"
+
+        msg += "\n"
+
+    return jsonify({
+        "fulfillmentText": msg
+    })
 
 
 if __name__ == "__main__":

@@ -7,7 +7,6 @@ from firebase_admin import credentials, firestore
 
 def get_db():
     if not firebase_admin._apps:
-
         if os.environ.get("serviceAccountKey"):
             firebase_json = json.loads(os.environ["serviceAccountKey"])
             cred = credentials.Certificate(firebase_json)
@@ -21,12 +20,7 @@ def get_db():
 
 def get_forecast_doc(city):
     db = get_db()
-
-    doc = (
-        db.collection("coastal_forecast")
-        .document(city)
-        .get()
-    )
+    doc = db.collection("coastal_forecast").document(city).get()
 
     if not doc.exists:
         return None
@@ -49,15 +43,20 @@ def get_city_from_context(req):
     return ""
 
 
-def build_date_menu(city, forecast):
-    msg = "我是羅翊綸的機器人\n\n"
-    msg += f"📍已選擇：{city}\n\n"
-    msg += "請選擇想查詢的日期：\n\n"
+def build_date_menu(city, coast, forecast):
+    msg = "🌊 正在為你查詢海邊天氣與潮汐資訊\n\n"
+    msg += f"📍查詢地區：{city}\n"
+
+    if coast:
+        msg += f"🏖️ 參考海岸：{coast}\n"
+
+    msg += "\n📅 請選擇查詢日期：\n\n"
 
     for i, day in enumerate(forecast[:7], start=1):
         msg += f"{i}. {day.get('displayDate', '')}\n"
 
     msg += "\n請直接輸入日期，例如：06-14"
+
     return msg
 
 
@@ -105,10 +104,13 @@ def find_day_by_date(forecast, user_date):
     return None
 
 
-def build_day_reply(city, day):
-    msg = "我是羅翊綸的機器人\n\n"
-    msg += f"📍{city}\n"
-    msg += f"📅 {day.get('displayDate', '')}\n\n"
+def build_day_reply(city, coast, day):
+    msg = f"📍{city}\n"
+
+    if coast:
+        msg += f"🏖️ {coast}\n"
+
+    msg += f"\n📅 {day.get('displayDate', '')}\n\n"
     msg += f"🌤️ 天氣：{day.get('weather', '')}\n"
     msg += f"🌡️ 溫度：{day.get('tempMin', '')}~{day.get('tempMax', '')}°C\n"
 
@@ -131,8 +133,7 @@ def build_day_reply(city, day):
 
 
 def build_date_not_found_reply(forecast):
-    msg = "我是羅翊綸的機器人\n\n"
-    msg += "找不到這個日期，請輸入以下其中一天：\n\n"
+    msg = "找不到這個日期，請輸入以下其中一天：\n\n"
 
     for day in forecast[:7]:
         msg += f"{day.get('displayDate', '')}\n"
@@ -168,18 +169,19 @@ def handle_weather_forecast(req, query_result):
 
     if data is None:
         return jsonify({
-            "fulfillmentText": f"我是羅翊綸的機器人\n\n找不到 {city} 的資料"
+            "fulfillmentText": f"找不到 {city} 的資料"
         })
 
     forecast = data.get("forecast", [])
+    coast = data.get("coast", "")
 
     if not forecast:
         return jsonify({
-            "fulfillmentText": f"我是羅翊綸的機器人\n\n{city} 目前沒有預報資料"
+            "fulfillmentText": f"{city} 目前沒有預報資料"
         })
 
     return jsonify({
-        "fulfillmentText": build_date_menu(city, forecast),
+        "fulfillmentText": build_date_menu(city, coast, forecast),
         "outputContexts": [
             {
                 "name": req["session"] + "/contexts/weather-followup",
@@ -216,10 +218,12 @@ def handle_weather_date_select(req, query_result):
     if data is None:
         return close_weather_context(
             req,
-            f"我是羅翊綸的機器人\n\n找不到 {city} 的資料"
+            f"找不到 {city} 的資料"
         )
 
     forecast = data.get("forecast", [])
+    coast = data.get("coast", "")
+
     target_day = find_day_by_date(forecast, user_date)
 
     if target_day is None:
@@ -229,7 +233,7 @@ def handle_weather_date_select(req, query_result):
 
     return close_weather_context(
         req,
-        build_day_reply(city, target_day)
+        build_day_reply(city, coast, target_day)
     )
 
 
@@ -249,5 +253,5 @@ def handle_dialogflow(req):
         return handle_weather_date_select(req, query_result)
 
     return jsonify({
-        "fulfillmentText": "我是羅翊綸的機器人\n\n我目前可以查詢縣市天氣與潮汐。"
+        "fulfillmentText": "我目前可以查詢縣市海邊天氣與潮汐。"
     })

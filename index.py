@@ -156,7 +156,7 @@ def build_date_menu(city, forecast):
 
 
 def normalize_user_date(text):
-    text = text.strip()
+    text = str(text).strip()
     text = text.replace("/", "-")
 
     if text in ["今天", "今日"]:
@@ -167,6 +167,13 @@ def normalize_user_date(text):
 
     if text == "後天":
         return "INDEX_2"
+
+    parts = text.split("-")
+
+    if len(parts) == 2:
+        month = parts[0].zfill(2)
+        day = parts[1].zfill(2)
+        return f"{month}-{day}"
 
     return text
 

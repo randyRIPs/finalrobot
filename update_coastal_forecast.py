@@ -1,3 +1,4 @@
+import os
 import json
 from datetime import datetime
 
@@ -14,7 +15,6 @@ urllib3.disable_warnings()
 # ==========================
 
 API_KEY = "rdec-key-123-45678-011121314"
-SERVICE_ACCOUNT_FILE = "serviceAccountKey.json"
 
 WEATHER_DATASET = "F-D0047-091"
 TIDE_DATASET = "F-A0021-001"
@@ -76,10 +76,6 @@ TIDE_KEYWORDS = {
 }
 
 
-# ==========================
-# 抓中央氣象署資料
-# ==========================
-
 def fetch_cwa_data(dataset_id):
     url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/{dataset_id}"
 
@@ -103,15 +99,18 @@ def fetch_cwa_data(dataset_id):
 
 def init_firebase():
     if not firebase_admin._apps:
-        cred = credentials.Certificate(SERVICE_ACCOUNT_FILE)
+
+        if os.environ.get("serviceAccountKey"):
+            firebase_json = json.loads(os.environ["serviceAccountKey"])
+            cred = credentials.Certificate(firebase_json)
+
+        else:
+            cred = credentials.Certificate("serviceAccountKey.json")
+
         firebase_admin.initialize_app(cred)
 
     return firestore.client()
 
-
-# ==========================
-# 小工具
-# ==========================
 
 def normalize_city_name(name):
     name = name.replace("臺", "台")
@@ -135,7 +134,6 @@ def get_element_value(time_item, key):
 
 def get_all_weather_locations(weather_data):
     result = {}
-
     groups = weather_data.get("records", {}).get("Locations", [])
 
     for group in groups:
@@ -174,10 +172,6 @@ def find_tide_location(city_name, tide_data):
 
     return None
 
-
-# ==========================
-# 天氣資料整理
-# ==========================
 
 def fill_element(forecast, elements, element_name, value_key, output_key):
     if element_name not in elements:
@@ -226,10 +220,6 @@ def build_weather_forecast(weather_location):
     return forecast
 
 
-# ==========================
-# 潮汐資料整理
-# ==========================
-
 def add_tide_to_forecast(city_name, forecast, tide_data):
     target_tide = find_tide_location(city_name, tide_data)
 
@@ -275,10 +265,6 @@ def add_tide_to_forecast(city_name, forecast, tide_data):
 
     return forecast, coast_name
 
-
-# ==========================
-# 主程式
-# ==========================
 
 def main():
     print("開始下載天氣資料...")

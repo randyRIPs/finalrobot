@@ -194,16 +194,25 @@ def build_weather_forecast(weather_location):
         raise Exception("找不到天氣現象資料")
 
     forecast = []
+    used_dates = set()
+
     weather_times = elements["天氣現象"].get("Time", [])
 
-    for t in weather_times[:DAYS]:
+    for t in weather_times:
         date = t.get("StartTime", "")[:10]
-        weather = get_element_value(t, "Weather")
+
+        if not date:
+            continue
+
+        if date in used_dates:
+            continue
+
+        used_dates.add(date)
 
         forecast.append({
             "date": date,
-            "displayDate": date[5:] if len(date) >= 10 else date,
-            "weather": weather,
+            "displayDate": date[5:],
+            "weather": get_element_value(t, "Weather"),
             "tempMin": "",
             "tempMax": "",
             "windDirection": "",
@@ -212,12 +221,33 @@ def build_weather_forecast(weather_location):
             "lowTide": []
         })
 
-    fill_element(forecast, elements, "最高溫度", "MaxTemperature", "tempMax")
-    fill_element(forecast, elements, "最低溫度", "MinTemperature", "tempMin")
-    fill_element(forecast, elements, "風向", "WindDirection", "windDirection")
-    fill_element(forecast, elements, "風速", "WindSpeed", "windSpeed")
+        if len(forecast) >= DAYS:
+            break
+
+    fill_element_by_date(forecast, elements, "最高溫度", "MaxTemperature", "tempMax")
+    fill_element_by_date(forecast, elements, "最低溫度", "MinTemperature", "tempMin")
+    fill_element_by_date(forecast, elements, "風向", "WindDirection", "windDirection")
+    fill_element_by_date(forecast, elements, "風速", "WindSpeed", "windSpeed")
 
     return forecast
+
+def fill_element_by_date(forecast, elements, element_name, value_key, output_key):
+    if element_name not in elements:
+        return
+
+    date_map = {}
+
+    for t in elements[element_name].get("Time", []):
+        date = t.get("StartTime", "")[:10]
+
+        if date and date not in date_map:
+            date_map[date] = get_element_value(t, value_key)
+
+    for day in forecast:
+        date = day.get("date", "")
+
+        if date in date_map:
+            day[output_key] = date_map[date]
 
 
 def add_tide_to_forecast(city_name, forecast, tide_data):

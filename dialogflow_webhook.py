@@ -53,7 +53,7 @@ def get_city_from_context(req):
 
 
 def build_date_menu(city, coast, forecast):
-    msg = "🌊 正在為你查詢海邊天氣與潮汐資訊\n\n"
+    msg = "🌊 正在為你查詢未來一周海邊天氣與潮汐資訊\n\n"
     msg += f"📍查詢地區：{city}\n"
 
     if coast:

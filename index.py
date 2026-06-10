@@ -47,20 +47,28 @@ def home():
 
 @app.route("/manual-update")
 def manual_update():
+    result = {
+        "coastal_forecast": None,
+        "port_fishing": None
+    }
+
     try:
         update_coastal_forecast()
-        update_port_fishing()
-
-        return jsonify({
-            "status": "success",
-            "message": "海邊天氣潮汐 + 商港垂釣資料更新完成"
-        })
-
+        result["coastal_forecast"] = "success"
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
+        result["coastal_forecast"] = f"error: {str(e)}"
+
+    try:
+        update_port_fishing()
+        result["port_fishing"] = "success"
+    except Exception as e:
+        result["port_fishing"] = f"error: {str(e)}"
+
+    return jsonify({
+        "status": "done",
+        "message": "更新流程已執行；單一資料源失敗不會讓整個系統崩潰",
+        "result": result
+    })
 
 
 @app.route("/webhook", methods=["POST"])

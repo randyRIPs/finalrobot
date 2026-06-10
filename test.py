@@ -1,28 +1,23 @@
 # update_port_fishing.py
+import os
+import json
 import requests
 import urllib3
 from datetime import datetime
 from bs4 import BeautifulSoup
 
-import os
-import json
-
 import firebase_admin
 from firebase_admin import credentials, firestore
 
+urllib3.disable_warnings()
+
+# ===== Firebase 初始化：支援本機 serviceAccountKey.json 與 Vercel 環境變數 =====
 if not firebase_admin._apps:
-
     if os.environ.get("serviceAccountKey"):
-        firebase_json = json.loads(
-            os.environ["serviceAccountKey"]
-        )
-
+        firebase_json = json.loads(os.environ["serviceAccountKey"])
         cred = credentials.Certificate(firebase_json)
-
     else:
-        cred = credentials.Certificate(
-            "serviceAccountKey.json"
-        )
+        cred = credentials.Certificate("serviceAccountKey.json")
 
     firebase_admin.initialize_app(cred)
 
@@ -80,7 +75,7 @@ def get_ports():
         url,
         headers=HEADERS,
         verify=False,
-        timeout=20
+        timeout=8
     )
 
     r.raise_for_status()
@@ -89,7 +84,9 @@ def get_ports():
     ports = []
 
     for item in data.get("data", {}).get("content", []):
-        ports.append(item.get("port"))
+        port = item.get("port")
+        if port:
+            ports.append(port)
 
     return ports
 
@@ -102,7 +99,7 @@ def get_regions(port):
         headers=HEADERS,
         params={"port": port},
         verify=False,
-        timeout=20
+        timeout=8
     )
 
     r.raise_for_status()
@@ -151,7 +148,12 @@ def main():
 
     print("開始抓取官方商港垂釣 API...")
 
-    ports = get_ports()
+    try:
+        ports = get_ports()
+    except Exception as e:
+        print(f"港口清單抓取失敗：{e}")
+        raise
+
     print("港口：", ports)
 
     all_spots = []
@@ -159,7 +161,11 @@ def main():
     for port in ports:
         print(f"\n抓取 {port} 垂釣區...")
 
-        regions = get_regions(port)
+        try:
+            regions = get_regions(port)
+        except Exception as e:
+            print(f"{port} 抓取失敗：{e}")
+            continue
 
         for item in regions:
             spot_name = (
@@ -190,6 +196,9 @@ def main():
             all_spots.append(spot)
 
             print(f"{port}｜{spot_name}｜{spot['status']}")
+
+    if not all_spots:
+        raise Exception("沒有抓到任何商港垂釣資料，可能是官方 API 暫時連不上")
 
     save_to_firebase(all_spots)
 
